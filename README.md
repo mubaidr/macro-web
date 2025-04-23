@@ -1,4 +1,4 @@
-# MacroWeb – DOM Macro Extension for Automated Clicks & Scrolls
+# MacroWeb - DOM Macro Extension for Automated Clicks & Scrolls
 
 **MacroWeb** is a browser extension that lets you automate DOM interactions like clicks and scrolls using a list of CSS selectors and delays. Ideal for repetitive tasks, testing UI flows, or automating browser workflows.
 
@@ -9,6 +9,8 @@
 - Add delays between actions
 - Simple JSON-based input
 - Lightweight and easy to use
+- Storage for saved macros
+- Import/export macros
 
 ## 🧠 Example Macro
 
@@ -40,8 +42,6 @@
 
 - Macro recording (optional)
 - Looping and conditional logic
-- Storage for saved macros
-- Import/export macros
 
 ## 🧑‍💻 Contributing
 

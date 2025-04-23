@@ -1,0 +1,28 @@
+{
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "js": [
+        "content.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "description": "Automate DOM interactions (clicks, scrolls) via JSON macros.",
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "manifest_version": 3,
+  "name": "MacroWeb",
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab"
+  ],
+  "version": "0.1.0"
+}

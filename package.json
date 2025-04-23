@@ -1,0 +1,16 @@
+{
+  "name": "macro-web",
+  "version": "0.1.0",
+  "description": "Automate DOM interactions (clicks, scrolls) via JSON macros.",
+  "scripts": {
+    "build": "tsc && npm run copy:manifest",
+    "copy:manifest": "cp manifest.json dist/manifest.json",
+    "clean": "rimraf dist",
+    "watch": "npm run copy:manifest && tsc --watch"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.316",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.8.3"
+  }
+}
