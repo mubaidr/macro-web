@@ -12,6 +12,11 @@
 - Storage for saved macros
 - Import/export macros
 
+## 📄 Roadmap
+
+- Macro recording (optional)
+- Looping and conditional logic
+
 ## 🧠 Example Macro
 
 ```json
@@ -34,14 +39,9 @@
 ## 🛠️ Usage
 
 1. Open the extension popup
-2. Paste your JSON macro
+2. Add macro or load your macro
 3. Hit "Run Macro"
 4. Watch the magic happen
-
-## 📄 Roadmap
-
-- Macro recording (optional)
-- Looping and conditional logic
 
 ## 🧑‍💻 Contributing
 

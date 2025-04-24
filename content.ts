@@ -82,7 +82,7 @@ const injectUI = (): void => {
     const container = document.createElement('div');
     container.id = 'macro-web-ui';
     container.style.position = 'fixed';
-    container.style.top = '10px';
+    container.style.bottom = '10px';
     container.style.right = '10px';
     container.style.zIndex = '99999';
     container.style.background = '#f8fafc';
@@ -91,10 +91,17 @@ const injectUI = (): void => {
     container.style.padding = '8px 10px 10px 10px';
     container.style.boxShadow = '0 2px 8px rgba(0,0,0,0.10)';
     container.style.fontFamily = 'Segoe UI, Arial, sans-serif';
-    container.style.width = '290px';
+    container.style.width = '480px';
     container.style.fontSize = '13px';
 
     container.innerHTML = `
+      <div id="macro-web-header" style="font-weight:bold;margin-bottom: 12px; display: flex;justify-content: space-between;">
+        <div>Macro Web</div>
+        <button id="macro-web-close" style="background:transparent;color:#b00;font-size:16px;border:none;cursor:pointer;line-height:1;">✕</button>
+      </div>
+      <p>
+        Automate DOM interactions like clicks and scrolls using a list of CSS selectors and delays.
+      </p>
       <div style="display:flex;gap:4px;margin-bottom:6px;align-items:center;">
         <select id="macro-web-action" style="flex:1;padding:2px 4px;border-radius:3px;border:1px solid #b6c2d1;font-size:12px;">
           <option value="click">Click</option>
@@ -106,20 +113,24 @@ const injectUI = (): void => {
         <button id="macro-web-add" style="background:#2563eb;color:#fff;border:none;border-radius:3px;padding:2px 6px;cursor:pointer;font-size:12px;">+</button>
       </div>
       <div style="display:flex;gap:4px;align-items:center;">
-        <textarea id="macro-web-input" rows="4" style="width:60%;resize:vertical;box-sizing:border-box;padding:3px 4px;border-radius:3px;border:1px solid #b6c2d1;font-family:monospace;font-size:12px;"></textarea>
-        <div id="macro-web-jsonview" style="width:40%;max-height:60px;overflow:auto;background:#f3f6fa;border-radius:3px;border:1px solid #d1d5db;padding:3px 4px;font-family:monospace;font-size:12px;"></div>
+        <textarea id="macro-web-input" rows="8" style="width:75%;resize:vertical;box-sizing:border-box;padding:3px 4px;border-radius:3px;border:1px solid #b6c2d1;font-family:monospace;font-size:12px;"></textarea>
+        <div id="macro-web-jsonview" style="width:25%;max-height:60px;overflow:auto;background:#f3f6fa;border-radius:3px;border:1px solid #d1d5db;padding:3px 4px;font-family:monospace;font-size:12px;"></div>
       </div>
-      <div style="margin-top:6px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
-        <button id="macro-web-run" style="background:#059669;color:#fff;border:none;border-radius:3px;padding:3px 8px;cursor:pointer;font-size:12px;">Run</button>
-        <button id="macro-web-save" style="background:#6366f1;color:#fff;border:none;border-radius:3px;padding:3px 8px;cursor:pointer;font-size:12px;">Save</button>
-        <button id="macro-web-load" style="background:#f59e42;color:#fff;border:none;border-radius:3px;padding:3px 8px;cursor:pointer;font-size:12px;">Load</button>
-        <button id="macro-web-export" style="background:#64748b;color:#fff;border:none;border-radius:3px;padding:3px 8px;cursor:pointer;font-size:12px;">Export</button>
-        <button id="macro-web-close" style="margin-left:auto;background:transparent;color:#b00;font-size:16px;border:none;cursor:pointer;line-height:1;">✕</button>
+      <div style="margin-top:6px;display:flex;gap:4px;align-items:right;flex-wrap:wrap;">
+        <button id="macro-web-save" style="background:#6366f1;color:#fff;border:none;border-radius:3px;padding:8px 8px;cursor:pointer;font-size:12px;">Save</button>
+        <button id="macro-web-load" style="background:#f59e42;color:#fff;border:none;border-radius:3px;padding:8px 8px;cursor:pointer;font-size:12px;">Load</button>
+        <button id="macro-web-export" style="background:#64748b;color:#fff;border:none;border-radius:3px;padding:8px 8px;cursor:pointer;font-size:12px;">Export</button>
+        <button id="macro-web-run" style="background:#059669;color:#fff;border:none;border-radius:3px;padding:8px 24px;cursor:pointer;font-size:12px; min-width: 96px;">Run</button>
       </div>
       <select id="macro-web-load-list" style="display:none;width:100%;margin-top:6px;padding:3px 4px;border-radius:3px;border:1px solid #b6c2d1;font-size:12px;"></select>
       <div id="macro-web-status" style="margin-top:6px;font-size:11px;color:#333;"></div>
+      <div id="macro-web-debug" style="margin-top:4px;font-size:11px;color:#444;background:#eef2fa;border-radius:3px;padding:3px 4px;max-height:80px;overflow:auto;white-space:pre-line;display:none;"></div>
     `;
     document.body.appendChild(container);
+
+    // Debug log clear on open
+    const debugEl = getElement<HTMLDivElement>('macro-web-debug');
+    if (debugEl) debugEl.textContent = '';
 
     const inputEl = getElement<HTMLTextAreaElement>('macro-web-input');
     const jsonView = getElement<HTMLDivElement>('macro-web-jsonview');
@@ -288,36 +299,137 @@ const setStatus = (msg: string, error = false): void => {
   }
 };
 
+const logDebug = (msg: string): void => {
+  const debugEl = getElement<HTMLDivElement>('macro-web-debug');
+  if (!debugEl) return;
+  debugEl.style.display = 'block';
+  debugEl.textContent += `${msg}\n`;
+  debugEl.scrollTop = debugEl.scrollHeight;
+};
+
+/**
+ * Recursively searches for the first matching element by selector in the given document and all accessible iframes.
+ * Returns the first match found, or null if not found.
+ */
+const findElementInAllFrames = <T extends Element>(selector: string, rootDoc: Document = document): T | null => {
+  const el = rootDoc.querySelector(selector) as T | null;
+  if (el) return el;
+  const iframes = Array.from(rootDoc.getElementsByTagName('iframe'));
+  for (const iframe of iframes) {
+    try {
+      const childDoc = iframe.contentDocument;
+      if (childDoc) {
+        const found = findElementInAllFrames<T>(selector, childDoc);
+        if (found) return found;
+      }
+    } catch {
+      // Cross-origin iframe, skip
+      continue;
+    }
+  }
+  return null;
+};
+
+/**
+ * Recursively collects all elements matching selector in the given document and all accessible iframes.
+ * Returns a flat array of all matches.
+ */
+const findAllElementsInAllFrames = <T extends Element>(selector: string, rootDoc: Document = document): T[] => {
+  if (typeof selector !== 'string' || !rootDoc) return [];
+  let results: T[] = Array.from(rootDoc.querySelectorAll(selector)) as T[];
+  const iframes = Array.from(rootDoc.getElementsByTagName('iframe'));
+  for (const iframe of iframes) {
+    try {
+      const childDoc = iframe.contentDocument;
+      if (childDoc) {
+        results = results.concat(findAllElementsInAllFrames<T>(selector, childDoc));
+      }
+    } catch {
+      // Cross-origin iframe, skip
+      continue;
+    }
+  }
+  return results;
+};
+
+const waitForElement = async <T extends Element>(selector: string, timeout = 3000): Promise<T | null> => {
+  const start = Date.now();
+  return new Promise((resolve) => {
+    const check = (): void => {
+      const el = findElementInAllFrames<T>(selector);
+      if (el) {
+        resolve(el);
+        return;
+      }
+      if (Date.now() - start > timeout) {
+        resolve(null);
+        return;
+      }
+      setTimeout(check, 100);
+    };
+    check();
+  });
+};
+
+const waitForElements = async <T extends Element>(selector: string, timeout = 3000): Promise<T[]> => {
+  const start = Date.now();
+  return new Promise((resolve) => {
+    const check = (): void => {
+      const els = findAllElementsInAllFrames<T>(selector);
+      if (els.length > 0) {
+        resolve(els);
+        return;
+      }
+      if (Date.now() - start > timeout) {
+        resolve([]);
+        return;
+      }
+      setTimeout(check, 100);
+    };
+    check();
+  });
+};
+
 const runMacro = async (macro: MacroAction[]): Promise<void> => {
-  for (const step of macro) {
+  logDebug('--- Macro run started ---');
+  for (let i = 0; i < macro.length; i++) {
+    const step = macro[i];
+    logDebug(`Step ${i + 1}/${macro.length}: ${JSON.stringify(step)}`);
     try {
       await new Promise((res) => setTimeout(res, step.delay));
       if (step.action === 'click') {
-        const el = document.querySelector(step.selector);
-        if (el instanceof HTMLElement) {
-          el.click();
+        const els = await waitForElements<HTMLElement>(step.selector, 3000);
+        if (els.length > 0) {
+          els.forEach((el) => el.click());
+          logDebug(`Clicked ${els.length} element(s): '${step.selector}'`);
         } else {
-          setStatus(`Click failed: selector '${step.selector}' not found`, true);
+          setStatus(`Click failed: selector '${step.selector}' not found after waiting`, true);
+          logDebug(`Click failed: selector '${step.selector}' not found after waiting. DOM snapshot: ${document.body.innerHTML.slice(0, 500)}...`);
         }
       } else if (step.action === 'scroll') {
-        const el = document.querySelector(step.selector);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const els = await waitForElements<Element>(step.selector, 3000);
+        if (els.length > 0) {
+          els.forEach((el) => el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+          logDebug(`Scrolled to ${els.length} element(s): '${step.selector}'`);
         } else {
-          setStatus(`Scroll failed: selector '${step.selector}' not found`, true);
+          setStatus(`Scroll failed: selector '${step.selector}' not found after waiting`, true);
+          logDebug(`Scroll failed: selector '${step.selector}' not found after waiting.`);
         }
       } else if (step.action === 'print') {
         printElement(step.selector);
+        logDebug(`Print triggered for: '${step.selector}'`);
       }
     } catch (err) {
       setStatus(`Macro step failed: ${(err as Error).message}`, true);
+      logDebug(`Step error: ${(err as Error).message}`);
     }
   }
+  logDebug('--- Macro run complete ---');
 };
 
 const printElement = (selector: string): void => {
   try {
-    const el = document.querySelector(selector);
+    const el = findElementInAllFrames(selector);
     if (!el) {
       setStatus(`Print failed: selector '${selector}' not found`, true);
       return;

@@ -6,7 +6,7 @@
     "build": "tsc && npm run copy:manifest",
     "copy:manifest": "cp manifest.json dist/manifest.json",
     "clean": "rimraf dist",
-    "watch": "npm run copy:manifest && tsc --watch"
+    "dev": "npm run copy:manifest && tsc --watch"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.316",
