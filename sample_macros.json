@@ -1,0 +1,38 @@
+[
+  {
+    "action": "click",
+    "selector": "#attachment-list #attach2 a.dropdown"
+  },
+  {
+    "action": "click",
+    "selector": ".popover.show #attachmentmenu a.download"
+  },
+  {
+    "action": "click",
+    "selector": "#attachment-list #attach3 a.dropdown"
+  },
+  {
+    "action": "click",
+    "selector": ".popover.show #attachmentmenu a.download"
+  },
+  {
+    "action": "click",
+    "selector": "#attachment-list #attach4 a.dropdown"
+  },
+  {
+    "action": "click",
+    "selector": ".popover.show #attachmentmenu a.download"
+  },
+  {
+    "action": "click",
+    "selector": ".header .menu #messagemenulink"
+  },
+  {
+    "action": "click",
+    "selector": ".popover .popupmenu .menu a.print"
+  },
+  {
+    "action": "keypress",
+    "key": "Enter"
+  }
+]

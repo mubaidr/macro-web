@@ -11,6 +11,8 @@ type MacroResponse =
   | { error: string }
   | { macros: Record<string, string> };
 
+type MacroKeypressRelay = { type: 'macro-keypress'; key: string; data?: unknown };
+
 const isMacroMessage = (msg: unknown): msg is MacroMessage => {
   if (!msg || typeof msg !== 'object' || !('type' in msg)) return false;
   const m = msg as Partial<MacroMessage>;
@@ -18,6 +20,12 @@ const isMacroMessage = (msg: unknown): msg is MacroMessage => {
   if (m.type === 'loadMacros') return true;
   if (m.type === 'deleteMacro') return typeof m.name === 'string';
   return false;
+};
+
+const isMacroKeypressRelay = (msg: unknown): msg is MacroKeypressRelay => {
+  if (!msg || typeof msg !== 'object') return false;
+  const m = msg as { type?: unknown; key?: unknown };
+  return m.type === 'macro-keypress' && typeof m.key === 'string';
 };
 
 const macroHandlers: Record<string, (message: MacroMessage, sendResponse: (resp: MacroResponse) => void) => void> = {
@@ -48,7 +56,17 @@ const macroHandlers: Record<string, (message: MacroMessage, sendResponse: (resp:
   },
 };
 
-chrome.runtime.onMessage.addListener((message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response: MacroResponse) => void): boolean => {
+chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  if (isMacroKeypressRelay(message)) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+      if (tab && tab.id !== undefined) {
+        chrome.tabs.sendMessage(tab.id, message);
+      }
+    });
+    // No response needed for relay
+    return;
+  }
   if (!isMacroMessage(message)) {
     sendResponse({ error: 'Invalid message' });
     return false;

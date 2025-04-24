@@ -2,19 +2,23 @@
 // Injects a minimalist UI and executes macros on the current page
 
 interface MacroAction {
-  action: 'click' | 'scroll' | 'print';
-  selector: string;
-  delay: number;
+  action: 'click' | 'scroll' | 'print' | 'keypress';
+  selector?: string; // Not required for keypress
+  delay?: number;
+  key?: string; // Only for keypress
+  data?: unknown; // Optional data for any action
 }
 
 const isMacroAction = (obj: unknown): obj is MacroAction => {
   if (!obj || typeof obj !== 'object') return false;
   const a = obj as Partial<MacroAction>;
+  if (a.action === 'keypress') {
+    return typeof a.action === 'string' && typeof a.key === 'string' && (typeof a.delay === 'number' || a.delay === undefined);
+  }
   return (
     (a.action === 'click' || a.action === 'scroll' || a.action === 'print') &&
     typeof a.selector === 'string' &&
-    typeof a.delay === 'number' &&
-    Number.isFinite(a.delay)
+    (typeof a.delay === 'number' || a.delay === undefined)
   );
 };
 
@@ -78,6 +82,8 @@ const renderJson = (json: unknown, container: HTMLElement): void => {
 
 const injectUI = (): void => {
   try {
+    // Don't inject UI if URL contains 'print'
+    if (window.location.href.toLowerCase().includes('print')) return;
     if (document.getElementById('macro-web-ui')) return;
     const container = document.createElement('div');
     container.id = 'macro-web-ui';
@@ -352,7 +358,7 @@ const findAllElementsInAllFrames = <T extends Element>(selector: string, rootDoc
   return results;
 };
 
-const waitForElement = async <T extends Element>(selector: string, timeout = 3000): Promise<T | null> => {
+const waitForElement = async <T extends Element>(selector: string, timeout = 500): Promise<T | null> => {
   const start = Date.now();
   return new Promise((resolve) => {
     const check = (): void => {
@@ -371,7 +377,7 @@ const waitForElement = async <T extends Element>(selector: string, timeout = 300
   });
 };
 
-const waitForElements = async <T extends Element>(selector: string, timeout = 3000): Promise<T[]> => {
+const waitForElements = async <T extends Element>(selector: string, timeout = 500): Promise<T[]> => {
   const start = Date.now();
   return new Promise((resolve) => {
     const check = (): void => {
@@ -390,15 +396,26 @@ const waitForElements = async <T extends Element>(selector: string, timeout = 30
   });
 };
 
+const isMacroKeypressMessage = (msg: unknown): msg is { type: 'macro-keypress'; key: string; data?: unknown } => {
+  if (!msg || typeof msg !== 'object') return false;
+  const m = msg as { type?: unknown; key?: unknown };
+  return m.type === 'macro-keypress' && typeof m.key === 'string';
+};
+
+const relayKeypressToBackground = (key: string, data?: unknown): void => {
+  chrome.runtime.sendMessage({ type: 'macro-keypress', key, data });
+};
+
 const runMacro = async (macro: MacroAction[]): Promise<void> => {
   logDebug('--- Macro run started ---');
   for (let i = 0; i < macro.length; i++) {
     const step = macro[i];
     logDebug(`Step ${i + 1}/${macro.length}: ${JSON.stringify(step)}`);
     try {
-      await new Promise((res) => setTimeout(res, step.delay));
+      await new Promise((res) => setTimeout(res, step.delay ?? 1000));
       if (step.action === 'click') {
-        const els = await waitForElements<HTMLElement>(step.selector, 3000);
+        if (!step.selector) throw new Error('Missing selector for click');
+        const els = await waitForElements<HTMLElement>(step.selector);
         if (els.length > 0) {
           els.forEach((el) => el.click());
           logDebug(`Clicked ${els.length} element(s): '${step.selector}'`);
@@ -407,7 +424,8 @@ const runMacro = async (macro: MacroAction[]): Promise<void> => {
           logDebug(`Click failed: selector '${step.selector}' not found after waiting. DOM snapshot: ${document.body.innerHTML.slice(0, 500)}...`);
         }
       } else if (step.action === 'scroll') {
-        const els = await waitForElements<Element>(step.selector, 3000);
+        if (!step.selector) throw new Error('Missing selector for scroll');
+        const els = await waitForElements<Element>(step.selector);
         if (els.length > 0) {
           els.forEach((el) => el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
           logDebug(`Scrolled to ${els.length} element(s): '${step.selector}'`);
@@ -416,8 +434,13 @@ const runMacro = async (macro: MacroAction[]): Promise<void> => {
           logDebug(`Scroll failed: selector '${step.selector}' not found after waiting.`);
         }
       } else if (step.action === 'print') {
+        if (!step.selector) throw new Error('Missing selector for print');
         printElement(step.selector);
         logDebug(`Print triggered for: '${step.selector}'`);
+      } else if (step.action === 'keypress') {
+        if (!step.key) throw new Error('Missing key for keypress');
+        relayKeypressToBackground(step.key, step.data);
+        logDebug(`Keypress '${step.key}' relayed to background for dispatch.`);
       }
     } catch (err) {
       setStatus(`Macro step failed: ${(err as Error).message}`, true);
@@ -445,5 +468,26 @@ const printElement = (selector: string): void => {
     setStatus(`Print error: ${(err as Error).message}`, true);
   }
 };
+
+// Listen for keypress event messages from background or popup
+chrome.runtime.onMessage.addListener((message: unknown, _sender, _sendResponse) => {
+  if (isMacroKeypressMessage(message)) {
+    const { key, data } = message;
+    const eventInit: KeyboardEventInit = { key };
+    if (data && typeof data === 'object') Object.assign(eventInit, data);
+    const event = new KeyboardEvent('keydown', eventInit);
+    const active = document.activeElement;
+    if (active && active instanceof HTMLElement) {
+      active.dispatchEvent(event);
+      logDebug(`(msg) Keypress '${key}' dispatched on active element: ${active.tagName.toLowerCase()}`);
+    } else if (document.body) {
+      document.body.dispatchEvent(event);
+      logDebug(`(msg) Keypress '${key}' dispatched on document.body (no active element)`);
+    } else {
+      setStatus('No valid target for keypress event', true);
+      logDebug('(msg) Keypress event target not found.');
+    }
+  }
+});
 
 injectUI();
